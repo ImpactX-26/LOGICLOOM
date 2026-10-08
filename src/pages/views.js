@@ -3,18 +3,24 @@ import { agH, chart, hypH, igH, sensRows, mcCard } from '../ui/panels.js'
 import { ALT, BP, D, TG, VX, VZ, tele } from '../core/world.js'
 import { RT, STN } from '../scene/volcanoScene.js'
 import { VOLCANOES, activeVolcano } from '../core/volcanoData.js'
+import { backtestH, verificationPageHTML } from '../core/backtest.js'
 
 /* ── Navigation definition ───────────────────────────────── */
 export const NAV = [
-  ['dash',    'Dashboard',      dashIco()],
-  ['map',     'Live Map',       mapIco()],
-  ['sensors', 'Sensors',        sensIco()],
-  ['ai',      'AI Analysis',    aiIco()],
-  ['drone',   'Drone Missions', droneIco()],
-  ['alerts',  'Alerts',         alertIco()],
-  ['reports', 'Reports',        repIco()],
-  ['settings','Settings',       settIco()],
+  ['dash',         'Dashboard',       dashIco()],
+  ['map',          'Live Map',        mapIco()],
+  ['sensors',      'Sensors',         sensIco()],
+  ['ai',           'AI Analysis',     aiIco()],
+  ['verification', 'AI Verification', veriIco()],
+  ['drone',        'Drone Missions',  droneIco()],
+  ['alerts',       'Alerts',          alertIco()],
+  ['reports',      'Reports',         repIco()],
+  ['settings',     'Settings',        settIco()],
 ]
+
+function veriIco() {
+  return svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>')
+}
 
 /* ── SVG icon helpers ────────────────────────────────────── */
 function svg(path, vb='0 0 24 24') {
@@ -321,7 +327,8 @@ export const VIEWS = {
         </div>
       </section>
     </div>
-  </div>`,
+  </div>
+  ${backtestH()}`,
 
   drone: () => {
     const d = tele()
@@ -430,7 +437,9 @@ export const VIEWS = {
         <button class="btn btn-cy" data-tg="sp">${O.sp}×</button>
       </div>
     </section>
-  </div>`
+  </div>`,
+
+  verification: () => verificationPageHTML()
 }
 
 /* ── Profile View ─────────────────────────────────────────── */

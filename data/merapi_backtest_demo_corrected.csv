@@ -1,0 +1,8 @@
+timestamp,volcano,seismic_ml,so2_ppm,thermal_c,deformation_cm,pressure_hpa,precipitation_mm,wind_speed_ms,actual_eruption,timestamp_utc,timestamp_wib,actual_outcome,ground_truth_status,agentic_ai_prediction,prediction_status
+2020-06-20 18:00,Merapi,1.2,210,34,0.3,1009,0.4,4.2,0,2020-06-20 18:00:00,2020-06-21 01:00:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-20 18:10,Merapi,1.3,218,35,0.4,1008,0.3,4.3,0,2020-06-20 18:10:00,2020-06-21 01:10:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-20 18:20,Merapi,1.4,225,36,0.5,1008,0.4,4.2,0,2020-06-20 18:20:00,2020-06-21 01:20:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-20 18:30,Merapi,1.2,215,35,0.4,1009,0.6,3.9,0,2020-06-20 18:30:00,2020-06-21 01:30:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-20 18:40,Merapi,1.3,221,35,0.4,1009,0.4,4.0,0,2020-06-20 18:40:00,2020-06-21 01:40:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-20 18:50,Merapi,1.4,224,36,0.5,1010,0.3,3.7,0,2020-06-20 18:50:00,2020-06-21 01:50:00,NO_ERUPTION,Historical no-eruption observation in this demo window,,
+2020-06-21 02:13,Merapi,2.8,390,52,1.1,1008,0.2,4.5,1,2020-06-21 02:13:00,2020-06-21 09:13:00,ERUPTION,Historically verified eruption/explosion event,,
