@@ -1,119 +1,89 @@
-import { DASH, LAND, NAV, VIEWS, authH, MOUNTAIN_LOGO_SVG } from '../pages/views.js'
+import { DASH, LAND, NAV, REP, VIEWS, authH } from '../pages/views.js'
 import { $, KEYS, META, NZ, O, RC, RK, S, U, UI, V, hooks } from '../core/data.js'
-import { fillDash } from '../ui/panels.js'
+import { STN, boot3D, mapEl } from '../scene/volcanoScene.js'
+import { initRealMap, setMapTileLayer, flyToVolcano, flyToUserLocation } from '../scene/realMap.js'
 import { initAuth3D } from '../scene/authScene.js'
 import { initAuth, signInEmail, signUpEmail, triggerOAuth, clearSession } from '../core/auth.js'
+import { fillDash, ui } from '../ui/panels.js'
 import { run } from '../core/sim.js'
+import { G, G0, VX, VZ, cam } from '../core/world.js'
+import { VOLCANOES, activeVolcano } from '../core/volcanoData.js'
 
 export let root, started = 0
 let auth3dCleanup = null
+let realMapDiv = null
 
 export function shell(inner) {
   const page = V.page || 'dash'
+  const activePage = { sensor: 'sensors', mission: 'drone' }[page] || page
 
-  return `
-    <div class="app-layout">
-      <!-- TOP GLOBAL HEADER BAR (Matching Reference Image) -->
-      <header class="top-header-bar">
-        <div class="header-left-brand">
-          <a class="header-brand-link" href="#/app/dash">
-            <span class="header-volcano-icon">
-              <svg viewBox="0 0 28 28" width="24" height="24">
-                <path d="M4 24 L11 8 L14 12 L17 8 L24 24 Z" fill="#94a3b8"/>
-                <path d="M12 10 L14 5 L16 10 Z" fill="#ff5247"/>
-                <circle cx="14" cy="5" r="2.5" fill="#ff7a45"/>
-              </svg>
-            </span>
-            <span class="header-brand-title">VOLCANO <span style="color:#ff5247">ZERO</span></span>
-          </a>
-          <span class="header-brand-divider"></span>
-          <span class="header-brand-subtitle">Autonomous Investigation Under Uncertainty</span>
-        </div>
-
-        <div class="header-right-tools">
-          <div class="system-status-pill">
-            <span class="status-green-dot"></span>
-            <span class="status-label-text">System Online</span>
-          </div>
-
-          <button class="header-bell-btn" onclick="location.hash='#/app/alerts'" title="Alerts &amp; Notifications">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
-            </svg>
-            <span class="bell-red-badge" id="bell-badge-count">${S.al.length ? '●' : ''}</span>
-          </button>
-
-          <a class="header-user-profile-btn" href="#/app/profile">
-            <div class="user-avatar-circle">
-              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80" alt="Shilpa P" class="user-avatar-img" onerror="this.style.display='none';this.parentElement.textContent='SP'" />
-            </div>
-            <span class="user-name-text">Shilpa P</span>
-            <span class="user-chevron-icon">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-            </span>
-          </a>
-        </div>
-      </header>
-
-      <!-- BODY: LEFT SIDEBAR + MAIN CONTENT -->
-      <div class="app-body-container">
-        <!-- LEFT SIDEBAR (Matching Reference Image) -->
-        <aside class="left-sidebar">
-          <nav class="sidebar-nav-menu">
-            ${NAV.map(n => {
-              const isActive = n[0] === page
-              return `
-                <a class="sidebar-nav-item ${isActive ? 'active' : ''}" href="#/app/${n[0]}">
-                  <span class="nav-icon-span">${n[2]}</span>
-                  <span class="nav-text-span">${n[1]}</span>
-                </a>
-              `
-            }).join('')}
-          </nav>
-
-          <!-- SIDEBAR BOTTOM WATERMARK FOOTER -->
-          <div class="sidebar-bottom-watermark">
-            <div class="watermark-logo">
-              ${MOUNTAIN_LOGO_SVG}
-            </div>
-            <div class="watermark-text-primary">Smarter Investigations.</div>
-            <div class="watermark-text-secondary">Safer Tomorrow.</div>
-          </div>
-        </aside>
-
-        <!-- MAIN SCROLLABLE VIEW -->
-        <main class="main-content-viewport" id="main-scroll-pane">
-          <div id="view">${inner}</div>
-        </main>
+  return `<div class="app">
+    <nav class="sb gl">
+      <div class="sb-brand">
+        <a class="brand" href="#/">
+          <span class="brand-icon">▲</span>
+          VOLCANO <b>ZERO</b>
+        </a>
       </div>
-    </div>
-  `
+      <div class="sb-section">OPERATIONAL VIEWS</div>
+      ${NAV.map(n => `<a class="ni${n[0] === activePage ? ' on' : ''}" href="#/app/${n[0]}">
+        ${n[2]}<span>${n[1]}</span>
+      </a>`).join('')}
+      <div class="sb-footer">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cy)">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+          Agentic AI Pipeline Active
+        </div>
+        <p style="margin-top:4px">Autonomous Investigation Under Uncertainty</p>
+      </div>
+    </nav>
+    <main>
+      <header class="top">
+        <input id="sq" class="sq" placeholder="Search country, volcano, station or page…" aria-label="Search">
+        <span class="sp"></span>
+        <div class="sys-pill" id="sysc">
+          <span class="sys-dot ${S.risk === 0 ? 'ok' : S.risk === 1 ? 'wa' : 'cr'}" id="sysd"></span>
+          <span id="systxt">${S.run ? 'Scenario Active' : S.risk === 0 ? 'System Online' : RK[S.risk]}</span>
+        </div>
+        <button class="bell-btn" aria-label="Alerts" onclick="location.hash='#/app/alerts'" title="Notifications">
+          🔔<sup id="bell"></sup>
+        </button>
+        <div class="tm">
+          <b id="clk">${V.CLK || '08:17 AM'}</b>
+          <small id="dt">${new Date().toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}</small>
+        </div>
+        <a class="av" href="#/app/profile" title="${U.name} · My Profile">${(U.name || 'O')[0]}</a>
+      </header>
+      <div id="view">${inner}</div>
+    </main>
+  </div>`
 }
 
 export function render() {
   const h = location.hash.slice(2).split('/')
   const a = h[0]
 
-  // Cleanup 3D background if leaving auth/landing
+  // Cleanup prior 3D auth background if leaving auth/landing
   if (auth3dCleanup) {
     auth3dCleanup()
     auth3dCleanup = null
   }
 
   if (a === 'app') {
-    const pageTarget = h[1] || 'dash'
-    V.page = NAV.some(n => n[0] === pageTarget) || ['alerts', 'profile'].includes(pageTarget) ? pageTarget : 'dash'
+    V.page = NAV.some(n => n[0] === h[1]) || ['profile','sensor','mission'].includes(h[1]) ? h[1] : 'dash'
+    if (V.page === 'sensor' && META[h[2]]) UI.sel = h[2]
 
     root.innerHTML = shell(
       V.page === 'dash' ? DASH :
-      VIEWS[V.page] ? VIEWS[V.page]() :
-      DASH
+      V.page === 'map' ? '<div class="ms big" id="mapslot"></div>' :
+      VIEWS[V.page]()
     )
 
-    if (V.page === 'dash') {
-      fillDash()
+    if (V.page === 'dash' || V.page === 'map') {
+      mountMap()
     }
+    if (V.page === 'dash') fillDash()
+    tick2()
   } else if (a === 'login' || a === 'signup') {
     root.innerHTML = authH(a)
     const bgContainer = document.getElementById('auth-3d-canvas')
@@ -127,82 +97,191 @@ export function render() {
       auth3dCleanup = initAuth3D(bgContainer)
     }
   }
+  scrollTo(0, 0)
+}
 
-  window.scrollTo(0, 0)
+function mountMap() {
+  const slot = $('#mapslot')
+  if (!slot) return
+  slot.innerHTML = ''
+
+  if (V.mapMode === '2d') {
+    if (!realMapDiv) {
+      realMapDiv = document.createElement('div')
+      realMapDiv.id = 'real-map'
+      realMapDiv.style.width = '100%'
+      realMapDiv.style.height = '100%'
+      realMapDiv.style.borderRadius = '16px'
+    }
+    slot.appendChild(realMapDiv)
+    initRealMap(realMapDiv)
+  } else {
+    slot.appendChild(mapEl)
+    boot3D()
+    ui()
+  }
 }
 
 export function refresh() {
   if (V.page === 'dash') {
     fillDash()
-  } else if (VIEWS[V.page] && location.hash.startsWith('#/app')) {
+    const titleEl = document.getElementById('active-volcano-title')
+    const subEl = document.getElementById('active-volcano-sub')
+    if (titleEl) titleEl.textContent = activeVolcano.name
+    if (subEl) subEl.textContent = `${activeVolcano.country} · ${activeVolcano.coords[0].toFixed(4)}° N, ${activeVolcano.coords[1].toFixed(4)}° E · Elev ${activeVolcano.elevation}m`
+  } else if (VIEWS[V.page] && V.page !== 'reports' && V.page !== 'settings' && V.page !== 'profile' && location.hash.startsWith('#/app')) {
     const vEl = document.getElementById('view')
     if (vEl) vEl.innerHTML = VIEWS[V.page]()
   }
+  ui()
+  tick2()
+}
+
+export function tick2() {
+  const c = $('#clk')
+  if (c) c.textContent = V.CLK
+  const dt = $('#dt')
+  if (dt) dt.textContent = new Date().toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+
+  const alertCount = S.al.filter(a => a.s === 2).length
+  const bell = $('#bell')
+  if (bell) bell.textContent = alertCount || ''
+
+  const d = document.getElementById('sysd')
+  const t = document.getElementById('systxt')
+  if (d && t) {
+    d.className = `sys-dot ${S.risk === 0 ? 'ok' : S.risk === 1 ? 'wa' : 'cr'}`
+    t.textContent = S.run ? 'Scenario Active' : S.risk === 0 ? 'System Online' : RK[S.risk]
+  }
+
+  const dashTime = document.getElementById('dash-time')
+  if (dashTime) dashTime.textContent = V.CLK
 }
 
 // Live simulation clock tick
 setInterval(() => {
   V.CLK = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   for (const k of KEYS) {
-    S.cur[k] += (S.tg[k] - S.cur[k]) * 0.4 + (Math.random() - 0.5) * NZ[k]
+    S.cur[k] += (S.tg[k] - S.cur[k]) * 0.6 + (Math.random() - 0.5) * NZ[k]
     S.h[k].push(S.cur[k])
     S.h[k].shift()
   }
-  const clockEl = document.getElementById('dash-live-clock')
-  if (clockEl) clockEl.textContent = V.CLK
-}, 2000)
+  if (location.hash.startsWith('#/app')) refresh()
+}, 1500)
 
-// Global click event handlers
+V.CLK = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+// Form Authentication submit handler
+export async function authGo(m) {
+  const emInput = $('#em')
+  const pwInput = $('#pw')
+  const msg = $('#msg')
+  const bad = t => { msg.className = 'msg er'; msg.textContent = t }
+
+  if (!emInput || !pwInput) return
+  const em = emInput.value.trim()
+  const pw = pwInput.value
+
+  if (m === 'signup' && !$('#nm').value.trim()) return bad('Please enter your full name.')
+  if (!/^\S+@\S+\.\S+$/.test(em)) return bad('Please enter a valid email address.')
+  if (pw.length < 6) return bad('Password must be at least 6 characters.')
+  if (m === 'signup' && pw !== $('#pw2').value) return bad('Passwords do not match.')
+
+  msg.className = 'msg info'
+  msg.innerHTML = '<span class="spn"></span> Authenticating credentials…'
+
+  try {
+    if (m === 'signup') {
+      await signUpEmail($('#nm').value.trim(), em, pw)
+    } else {
+      await signInEmail(em, pw)
+    }
+    msg.className = 'msg ok'
+    msg.textContent = '✓ Authentication successful. Entering command center…'
+    setTimeout(() => {
+      location.hash = '#/app/dash'
+    }, 600)
+  } catch (err) {
+    bad(err.message || 'Authentication failed. Please verify credentials.')
+  }
+}
+
+// Global click delegation
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-maptype], [data-k], [data-oauth], [data-a], [data-demo], #btn-logout')
+  const t = e.target.closest('[data-c],[data-k],[data-f],[data-rep],[data-tg],[data-a],[data-st],[data-demo],[data-oauth],[data-mode],[data-tile],#go,#btn-my-loc,#btn-logout,#btn-logout-2')
   if (!t) return
+  const d = t.dataset
 
-  // Map toggle [ Map ] vs [ Satellite ]
-  if (t.dataset.maptype) {
-    UI.mapType = t.dataset.maptype
-    const mapBtn = document.getElementById('btn-switch-map')
-    const satBtn = document.getElementById('btn-switch-sat')
-    if (mapBtn && satBtn) {
-      mapBtn.classList.toggle('active', UI.mapType === 'map')
-      satBtn.classList.toggle('active', UI.mapType === 'satellite')
-    }
-    const imgEl = document.getElementById('island-img')
-    if (imgEl) {
-      imgEl.style.filter = UI.mapType === 'satellite' ? 'contrast(1.2) saturate(1.15) brightness(0.9)' : 'none'
-    }
-    return
-  }
-
-  // Click on sensor cards / pins
-  if (t.dataset.k) {
-    UI.sel = t.dataset.k
-    location.hash = '#/app/sensors'
-    return
-  }
-
-  // Demo trigger
-  if (t.dataset.demo) {
+  // Start demo scenario
+  if (t.id === 'go') return run()
+  if (d.demo) {
     location.hash = '#/app/dash'
-    setTimeout(run, 1000)
+    setTimeout(run, 1500)
     return
   }
 
   // Logout
-  if (t.id === 'btn-logout') {
+  if (t.id === 'btn-logout' || t.id === 'btn-logout-2') {
     clearSession()
     location.hash = '#/'
     return
   }
 
-  // OAuth buttons
-  if (t.dataset.oauth) {
+  // Map 2D / 3D mode switch
+  if (d.mode) {
+    V.mapMode = d.mode
+    const b2d = document.getElementById('btn-mode-2d')
+    const b3d = document.getElementById('btn-mode-3d')
+    const tileGrp = document.getElementById('tile-layer-group')
+    if (b2d && b3d) {
+      b2d.classList.toggle('on', d.mode === '2d')
+      b3d.classList.toggle('on', d.mode === '3d')
+    }
+    if (tileGrp) tileGrp.style.display = d.mode === '2d' ? 'flex' : 'none'
+    mountMap()
+    return
+  }
+
+  // Map tile switch (Satellite / Dark)
+  if (d.tile) {
+    setMapTileLayer(d.tile)
+    const bSat = document.getElementById('btn-tile-sat')
+    const bDark = document.getElementById('btn-tile-dark')
+    if (bSat && bDark) {
+      bSat.classList.toggle('on', d.tile === 'satellite')
+      bDark.classList.toggle('on', d.tile === 'dark')
+    }
+    return
+  }
+
+  // "My Location" GPS Button
+  if (t.id === 'btn-my-loc') {
+    const btn = t
+    const orig = btn.innerHTML
+    btn.innerHTML = '<span class="spn"></span> Locating…'
+    flyToUserLocation(
+      (coords) => {
+        btn.innerHTML = '✓ Found GPS'
+        setTimeout(() => btn.innerHTML = orig, 2500)
+      },
+      (errMsg) => {
+        btn.innerHTML = '⚠️ Denied'
+        alert(errMsg)
+        setTimeout(() => btn.innerHTML = orig, 2500)
+      }
+    )
+    return
+  }
+
+  // OAuth triggers (Google / GitHub)
+  if (d.oauth) {
     const msg = $('#msg')
     if (msg) {
       msg.className = 'msg info'
-      msg.innerHTML = `<span class="spn"></span> Connecting to ${t.dataset.oauth.toUpperCase()} OAuth...`
+      msg.innerHTML = `<span class="spn"></span> Connecting to ${d.oauth.toUpperCase()} OAuth provider…`
     }
     try {
-      await triggerOAuth(t.dataset.oauth)
+      await triggerOAuth(d.oauth)
     } catch (err) {
       if (msg) {
         msg.className = 'msg er'
@@ -212,59 +291,87 @@ document.addEventListener('click', async e => {
     return
   }
 
-  // Auth password toggle
-  if (t.dataset.a === 'pw' || t.dataset.a === 'pw2') {
-    const inp = $(t.dataset.a === 'pw2' ? '#pw2' : '#pw')
-    if (inp) {
-      inp.type = inp.type === 'password' ? 'text' : 'password'
-      t.textContent = inp.type === 'password' ? '👁' : '🔒'
+  // Sensors & Navigation
+  if (d.k) {
+    UI.sel = d.k
+    if (V.page === 'dash') location.hash = '#/app/sensors'
+    else refresh()
+    return
+  }
+  if (d.f) { UI.f = d.f; return refresh() }
+  if (d.rep) {
+    UI.rep = REP[d.rep]()
+    const vEl = document.getElementById('view')
+    if (vEl) vEl.innerHTML = VIEWS.reports()
+    return
+  }
+  if (d.tg) {
+    if (d.tg === 'sp') O.sp = O.sp === 1 ? 2 : O.sp === 2 ? 0.5 : 1
+    else O[d.tg] = O[d.tg] ? 0 : 1
+    document.body.classList.toggle('rm', !!O.rm)
+    const vEl = document.getElementById('view')
+    if (vEl) vEl.innerHTML = VIEWS[V.page]()
+    return
+  }
+
+  // Password visibility toggle
+  if (d.a === 'pw' || d.a === 'pw2') {
+    const i = $(d.a === 'pw2' ? '#pw2' : '#pw')
+    if (i) {
+      i.type = i.type === 'password' ? 'text' : 'password'
+      t.textContent = i.type === 'password' ? 'Show' : 'Hide'
     }
     return
   }
 
-  // Auth form submit
-  if (t.dataset.a === 'login' || t.dataset.a === 'signup') {
-    const m = t.dataset.a
-    const emInput = $('#em')
-    const pwInput = $('#pw')
-    const msg = $('#msg')
-    if (!emInput || !pwInput || !msg) return
+  if (d.st) { V.SEL = { t: 'st', id: d.st }; return }
+  if (d.a) return authGo(d.a)
 
-    const em = emInput.value.trim()
-    const pw = pwInput.value
-    if (m === 'signup' && !$('#nm').value.trim()) {
-      msg.className = 'msg er'
-      msg.textContent = 'Please enter your full name.'
-      return
-    }
-    if (!/^\S+@\S+\.\S+$/.test(em)) {
-      msg.className = 'msg er'
-      msg.textContent = 'Please enter a valid email address.'
-      return
-    }
-    if (pw.length < 6) {
-      msg.className = 'msg er'
-      msg.textContent = 'Password must be at least 6 characters.'
-      return
-    }
+  // 3D Controls
+  if (d.c === 'x') { V.SEL = null; return ui() }
+  if (d.c === '2d') G.ph = 0.02
+  if (d.c === '3d') G.ph = 1
+  if (d.c === 'in') G.d = Math.max(22, G.d * 0.8)
+  if (d.c === 'out') G.d = Math.min(220, G.d * 1.25)
+  if (d.c === 'rs') cam(G0)
+  if (d.c === 'cl') G.d > 60 ? cam({ tx: VX, tz: VZ, ty: 16, d: 40, ph: 0.95 }) : cam(G0)
+})
 
-    msg.className = 'msg info'
-    msg.innerHTML = '<span class="spn"></span> Signing in...'
-    try {
-      if (m === 'signup') {
-        await signUpEmail($('#nm').value.trim(), em, pw)
-      } else {
-        await signInEmail(em, pw)
-      }
-      msg.className = 'msg ok'
-      msg.textContent = '✓ Welcome back. Redirecting...'
-      setTimeout(() => location.hash = '#/app/dash', 500)
-    } catch (err) {
-      msg.className = 'msg er'
-      msg.textContent = err.message || 'Authentication failed.'
-    }
+// Volcano selector dropdown change handler
+document.addEventListener('change', e => {
+  if (e.target.id === 'volcano-select') {
+    const selectedId = e.target.value
+    flyToVolcano(selectedId)
+    refresh()
+  }
+})
+
+// Search input keydown handler
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'sq' || e.key !== 'Enter') return
+  const q = e.target.value.toLowerCase().trim()
+  if (!q) return
+
+  // Search real volcano
+  const matchedVolcano = VOLCANOES.find(v => v.name.toLowerCase().includes(q) || v.country.toLowerCase().includes(q) || v.id.includes(q))
+  if (matchedVolcano) {
+    flyToVolcano(matchedVolcano.id)
+    if (V.page !== 'dash' && V.page !== 'map') location.hash = '#/app/dash'
+    refresh()
     return
   }
+
+  // Search stations
+  const matchedStation = STN.find(s => s.n.toLowerCase().includes(q))
+  if (matchedStation) {
+    V.SEL = { t: 'st', id: matchedStation.id }
+    location.hash = '#/app/dash'
+    return
+  }
+
+  // Search pages
+  const n = NAV.find(n => n[1].toLowerCase().includes(q))
+  if (n) location.hash = '#/app/' + n[0]
 })
 
 hooks.refresh = refresh
@@ -275,5 +382,6 @@ export async function start() {
   root = $('#root')
   await initAuth()
   addEventListener('hashchange', render)
+  document.body.classList.toggle('rm', !!O.rm)
   render()
 }
