@@ -1,0 +1,22 @@
+import { AGN, CC, HYC, HYN, KEYS, LV, META, RC, RK, S, UI, V, hooks, lvl } from '../core/data.js'
+import { STN, ZN, mapEl, q } from '../scene/volcanoScene.js'
+import { tele } from '../core/world.js'
+
+/* ---------- UI helpers ---------- */
+export const spark=(a,col,w=90,h=26)=>{const mn=Math.min(...a),r=(Math.max(...a)-mn)||1;return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polyline fill="none" stroke="${col}" stroke-width="1.6" points="${a.map((v,i)=>(i*w/(a.length-1)).toFixed(1)+','+(h-2-(v-mn)/r*(h-4)).toFixed(1)).join(' ')}"/></svg>`};
+export const chart=(a,col)=>{const w=640,h=220,mn=Math.min(...a)*.9,r=(Math.max(...a)*1.1-mn)||1,d=a.map((v,i)=>(i*w/(a.length-1)).toFixed(1)+','+(h-10-(v-mn)/r*(h-30)).toFixed(1)).join(' ');return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="220" preserveAspectRatio="none"><polygon fill="${col}" opacity=".18" points="0,${h} ${d} ${w},${h}"/><polyline fill="none" stroke="${col}" stroke-width="2.5" points="${d}"/></svg>`};
+export const sensRows=()=>KEYS.map(k=>{const m=META[k],l=lvl(k);return `<div class="sr${k===UI.sel&&V.page==='sensors'?' on':''}" data-k="${k}"><div><div class="mu">${m[0]}</div><b>${m[3](S.cur[k])}</b></div><div class="r"><span style="color:${CC[l]}">${LV[l]}</span>${spark(S.h[k],CC[l])}</div></div>`}).join('');
+export const hypH=()=>HYN.map((n,i)=>`<div class="hb"><span>${n}</span><div class="bar"><i style="width:${S.hy[i]}%;background:${HYC[i]}"></i></div><b>${S.hy[i]}%</b></div>`).join('');
+export const actH=()=>S.act.map((a,i)=>`<div class="ac"><i>${i+1}</i>${a}</div>`).join('');
+export const tlH=()=>S.tl.length?S.tl.map(e=>`<div class="te"><i style="background:${['#38bdf8','#fbbf24','#f43f5e'][e.s]}"></i><span class="mu">${e.t}</span><span>${e.m}</span></div>`).join(''):'<p class="mu">No events yet. Start the volcano scenario to watch the agents work.</p>';
+export const agH=()=>AGN.map(a=>`<div class="${a[0] in S.ag?'on':''}"><i></i><span>${a[0].toUpperCase()}${a[0] in S.ag?' — '+S.ag[a[0]]:''}</span></div>`).join('');
+export const igH=()=>S.ig?S.ig.map((x,i)=>`<div class="hb"><span>${x[0]}${i?'':' ✔'}</span><div class="bar"><i style="width:${x[1]*100}%;background:${i?'#38bdf8':'#34d399'}"></i></div><b>${x[1]}</b></div>`).join(''):'<p class="mu">Not evaluated yet. Runs when evidence conflicts.</p>';
+export function fillDash(){const s=(i,h)=>{const e=document.getElementById(i);if(e)e.innerHTML=h};s('sensP',`<h3>Live Sensor Readings</h3>${sensRows()}`);s('hyp',`<h3>Current Hypothesis</h3>${hypH()}`);s('act',actH());const t=document.getElementById('tl');if(t){t.innerHTML=tlH();t.scrollTop=t.scrollHeight}}
+export function ui(){if(!mapEl.isConnected)return;const rc=RC[S.risk];q('#stt').innerHTML=`<div class="ic" style="border-color:${rc};color:${rc}">⚠</div><div><small>VOLCANO STATUS</small><b style="color:${rc}">${S.st}</b><em>Risk ${RK[S.risk]} · Weather ${S.wx} · Satellite linked</em></div>`;
+const b=q('#ban');if(b.dataset.t!==S.ban){b.dataset.t=S.ban;b.innerHTML=`<span class="bn">${S.ban}</span>`}q('#agp').innerHTML=agH();q('#go').textContent=S.run?'Scenario running…':S.done?'↻ Replay volcano scenario':'▶ Start volcano scenario';q('#go').disabled=!!S.run;
+const tl=q('#tel'),d=tele();tl.hidden=!S.mn;if(S.mn)tl.innerHTML=`<small>DRONE-01</small><p><b>${S.mn}</b></p><p><span class="mu">Status</span><b>${S.dst}</b></p><p><span class="mu">Altitude</span>${d.alt} m</p><p><span class="mu">Speed</span>${d.spd} m/s</p><p><span class="mu">Battery</span>${d.bat}%</p><p><span class="mu">Signal</span>${d.sig}</p><p><span class="mu">To target</span>${d.dist} m</p>`;
+const p=q('#info');if(!V.SEL){p.hidden=true;return}p.hidden=false;let h;if(V.SEL.t==='st'){const o=STN.find(x=>x.id===V.SEL.id),m=META[o.k],l=lvl(o.k),a=S.h[o.k],dd=a[23]-a[16],e=m[4][0]*.02;h=`<small>${o.n.toUpperCase()}</small><div class="mu">${o.ty} sensor</div><b class="big">${m[3](S.cur[o.k])}</b><div>Status: <b style="color:${CC[l]}">${LV[l].toUpperCase()}</b></div><small>Updated ${V.CLK} · ${dd>e?'↗ Rising':dd<-e?'↘ Falling':'→ Stable'}</small>`}
+else if(V.SEL.t==='dr')h=`<small>DRONE-01</small><b class="big">${S.dst}</b><div class="mu">${S.mn||'No active mission'}</div><small>Alt ${d.alt} m · ${d.spd} m/s · ${d.bat}%</small>`;else{const z=ZN[V.SEL.i];h=`<small>${z[0]}</small><b class="big">${S.risk>=2&&V.SEL.i<2?['','','High','Critical'][S.risk]+' risk':V.SEL.i===0?'High risk':V.SEL.i===1?'Moderate risk':'Monitoring'}</b><div class="mu">${z[1]}</div>`}
+p.innerHTML=`<button class="x" data-c="x" aria-label="Close">×</button>`+h}
+
+hooks.ui=ui;
