@@ -8,6 +8,7 @@ import { fillDash, ui } from '../ui/panels.js'
 import { run } from '../core/sim.js'
 import { G, G0, VX, VZ, cam } from '../core/world.js'
 import { VOLCANOES, activeVolcano } from '../core/volcanoData.js'
+import { backtestState } from '../core/backtest.js'
 
 export let root, started = 0
 let auth3dCleanup = null
@@ -69,8 +70,14 @@ export function render() {
     auth3dCleanup = null
   }
 
+  // Direct route for #/verification
+  if (a === 'verification') {
+    location.hash = '#/app/verification'
+    return
+  }
+
   if (a === 'app') {
-    V.page = NAV.some(n => n[0] === h[1]) || ['profile','sensor','mission'].includes(h[1]) ? h[1] : 'dash'
+    V.page = NAV.some(n => n[0] === h[1]) || ['profile','sensor','mission','verification'].includes(h[1]) ? h[1] : 'dash'
     if (V.page === 'sensor' && META[h[2]]) UI.sel = h[2]
 
     root.innerHTML = shell(
@@ -208,9 +215,43 @@ export async function authGo(m) {
 
 // Global click delegation
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-c],[data-k],[data-f],[data-rep],[data-tg],[data-a],[data-st],[data-demo],[data-oauth],[data-mode],[data-tile],#go,#btn-my-loc,#btn-logout,#btn-logout-2')
+  const t = e.target.closest('[data-c],[data-k],[data-f],[data-rep],[data-tg],[data-a],[data-st],[data-demo],[data-oauth],[data-mode],[data-tile],[data-bkt-ds],[data-bkt-row],[data-action],#go,#btn-my-loc,#btn-logout,#btn-logout-2')
   if (!t) return
   const d = t.dataset
+
+  // Run historical verification demo button
+  if (d.action === 'run-verification') {
+    backtestState.isVerifying = true
+    refresh()
+    setTimeout(() => {
+      backtestState.isVerifying = false
+      backtestState.verificationRan = true
+      refresh()
+    }, 550)
+    return
+  }
+
+  // Toggle raw CSV inspection view
+  if (d.action === 'toggle-raw-csv') {
+    backtestState.showRawCSV = !backtestState.showRawCSV
+    refresh()
+    return
+  }
+
+  // Backtest dataset switch
+  if (d.bktDs) {
+    backtestState.activeDatasetKey = d.bktDs
+    backtestState.selectedRowIndex = 6
+    refresh()
+    return
+  }
+
+  // Backtest row inspection select
+  if (d.bktRow !== undefined) {
+    backtestState.selectedRowIndex = parseInt(d.bktRow, 10)
+    refresh()
+    return
+  }
 
   // Start demo scenario
   if (t.id === 'go') return run()
@@ -383,5 +424,11 @@ export async function start() {
   await initAuth()
   addEventListener('hashchange', render)
   document.body.classList.toggle('rm', !!O.rm)
+
+  // Direct pathname /verification support
+  if (location.pathname === '/verification' || location.pathname.endsWith('/verification')) {
+    location.hash = '#/app/verification'
+  }
+
   render()
 }
