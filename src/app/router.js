@@ -9,10 +9,12 @@ import { run } from '../core/sim.js'
 import { G, G0, VX, VZ, cam } from '../core/world.js'
 import { VOLCANOES, activeVolcano } from '../core/volcanoData.js'
 import { backtestState } from '../core/backtest.js'
+import { mountCommunityAlerts } from '../../community-alerts/mount.js'
 
 export let root, started = 0
 let auth3dCleanup = null
 let realMapDiv = null
+let unmountCommunityAlerts = null
 
 export function shell(inner) {
   const page = V.page || 'dash'
@@ -90,6 +92,8 @@ export function render() {
       mountMap()
     }
     if (V.page === 'dash') fillDash()
+    if (unmountCommunityAlerts) { unmountCommunityAlerts(); unmountCommunityAlerts = null }
+    if (V.page === 'community') unmountCommunityAlerts = mountCommunityAlerts(document.getElementById('community-alerts-root'))
     tick2()
   } else if (a === 'login' || a === 'signup') {
     root.innerHTML = authH(a)
@@ -136,7 +140,7 @@ export function refresh() {
     const subEl = document.getElementById('active-volcano-sub')
     if (titleEl) titleEl.textContent = activeVolcano.name
     if (subEl) subEl.textContent = `${activeVolcano.country} · ${activeVolcano.coords[0].toFixed(4)}° N, ${activeVolcano.coords[1].toFixed(4)}° E · Elev ${activeVolcano.elevation}m`
-  } else if (VIEWS[V.page] && V.page !== 'reports' && V.page !== 'settings' && V.page !== 'profile' && location.hash.startsWith('#/app')) {
+  } else if (VIEWS[V.page] && V.page !== 'reports' && V.page !== 'community' && V.page !== 'settings' && V.page !== 'profile' && location.hash.startsWith('#/app')) {
     const vEl = document.getElementById('view')
     if (vEl) vEl.innerHTML = VIEWS[V.page]()
   }
